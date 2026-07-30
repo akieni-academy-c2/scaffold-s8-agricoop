@@ -10,6 +10,10 @@ Puis testez dans le navigateur :
    http://localhost:5000/api/paiements
    http://localhost:5000/api/ventes-stock
    http://localhost:5000/api/statistiques
+   http://localhost:5000/api/rapport-bailleur
+   http://localhost:5000/api/utilisateurs
+   http://localhost:5000/api/villages
+   (POST) http://localhost:5000/api/login
 ========================================================================
 """
 from flask import Flask, request, jsonify
@@ -56,8 +60,13 @@ def dashboard():
 
 
 # ---------- Module 2 : Membres --------------------------------------------
-@app.route("/api/membres")
+@app.route("/api/membres", methods=["GET", "POST"])
 def membres():
+    if request.method == "POST":
+        payload = request.get_json(force=True)
+        resultat = controllers.creer_membre_controller(payload)
+        code = 201 if resultat.get("succes") else 400
+        return jsonify(resultat), code
     return jsonify(controllers.membres_controller())
 
 
@@ -67,6 +76,11 @@ def membre_detail(membre_id):
     if resultat is None:
         return jsonify({"erreur": "Membre introuvable"}), 404
     return jsonify(resultat)
+
+
+@app.route("/api/villages")
+def villages():
+    return jsonify(controllers.villages_controller())
 
 
 # ---------- Module 3 : Livraisons -----------------------------------------
@@ -111,6 +125,31 @@ def statistiques():
 @app.route("/api/rapport-bailleur")
 def rapport_bailleur():
     return jsonify(controllers.rapport_bailleur_controller())
+
+
+# ---------- Module 7 : Authentification & Comptes (NOUVEAU) ----------------
+@app.route("/api/login", methods=["POST"])
+def login():
+    payload = request.get_json(force=True)
+    resultat = controllers.login_controller(payload)
+    code = 200 if resultat.get("succes") else 401
+    return jsonify(resultat), code
+
+
+@app.route("/api/utilisateurs", methods=["GET", "POST"])
+def utilisateurs():
+    if request.method == "POST":
+        payload = request.get_json(force=True)
+        resultat = controllers.creer_utilisateur_controller(payload)
+        code = 201 if resultat.get("succes") else 400
+        return jsonify(resultat), code
+    return jsonify(controllers.utilisateurs_controller())
+
+
+@app.route("/api/verifier-acces", methods=["POST"])
+def verifier_acces():
+    payload = request.get_json(force=True)
+    return jsonify(controllers.verifier_acces_controller(payload.get("role"), payload.get("action")))
 
 
 if __name__ == "__main__":

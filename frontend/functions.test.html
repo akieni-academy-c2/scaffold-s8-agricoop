@@ -29,11 +29,17 @@
 
     try {
       // --- Dev FS1 ---
+      verifier("validerFormulaireLogin accepte des identifiants remplis",
+        validerFormulaireLogin({ nom_utilisateur: "smalonga", mot_de_passe: "Secretaire2026" }) === true);
+
+      verifier("validerFormulaireLogin rejette un mot de passe vide",
+        validerFormulaireLogin({ nom_utilisateur: "smalonga", mot_de_passe: "" }) === false);
+
+      verifier("validerFormulaireLogin rejette un nom d'utilisateur vide",
+        validerFormulaireLogin({ nom_utilisateur: "   ", mot_de_passe: "abc" }) === false);
+
       verifier("compterJoursActifs compte les jours au-dessus du seuil",
         compterJoursActifs({ "2026-07-08": 135, "2026-07-09": 60, "2026-07-10": 110 }, 100) === 2);
-
-      verifier("formaterDate convertit AAAA-MM-JJ en JJ/MM/AAAA",
-        formaterDate("2026-07-12") === "12/07/2026");
 
       // --- Dev FS2 ---
       verifier("filtrerMembresParStatut garde le bon statut",
@@ -50,6 +56,12 @@
 
       verifier("rechercherMembreParNom retourne tout si texte vide",
         rechercherMembreParNom([{ nom: "Jean Mabiala" }, { nom: "Sandra Malonga" }], "").length === 2);
+
+      verifier("validerFormulaireNouveauMembre accepte un formulaire complet",
+        validerFormulaireNouveauMembre({ nom: "Koumba", prenom: "Marie", village: "Séo", contact: "064111222" }).valide === true);
+
+      verifier("validerFormulaireNouveauMembre signale les champs manquants",
+        validerFormulaireNouveauMembre({ nom: "Koumba", prenom: "", village: "Séo", contact: "" }).erreurs.length === 2);
 
       // --- Dev FS3 ---
       verifier("validerFormulaireLivraison accepte un formulaire correct",
@@ -69,13 +81,16 @@
 
       // --- Dev FS4 ---
       verifier("validerFormulairePaiement accepte un formulaire correct",
-        validerFormulairePaiement({ membre_id: 1, montant: "5000" }) === true);
+        validerFormulairePaiement({ membre_id: 1, montant: "5000", mode_paiement: "Espèces" }) === true);
 
       verifier("validerFormulairePaiement rejette un montant à 0",
-        validerFormulairePaiement({ membre_id: 1, montant: "0" }) === false);
+        validerFormulairePaiement({ membre_id: 1, montant: "0", mode_paiement: "Espèces" }) === false);
 
       verifier("validerFormulairePaiement rejette un membre_id vide",
-        validerFormulairePaiement({ membre_id: "", montant: "5000" }) === false);
+        validerFormulairePaiement({ membre_id: "", montant: "5000", mode_paiement: "Espèces" }) === false);
+
+      verifier("validerFormulairePaiement rejette un mode de paiement invalide",
+        validerFormulairePaiement({ membre_id: 1, montant: "5000", mode_paiement: "Chèque" }) === false);
 
       verifier("calculerTotalPaiements additionne correctement",
         calculerTotalPaiements([{ montant: 5000 }, { montant: 3000 }, { montant: 2000 }]) === 10000);
@@ -93,15 +108,18 @@
       verifier("getBadgeStock -> Disponible",
         getBadgeStock(80) === "Disponible");
 
+      verifier("formaterMontant ajoute FCFA",
+        formaterMontant(23000) === "23000 FCFA");
+
+      // --- Dev FS6 ---
       verifier("trierClassementParVolume trie du plus gros producteur au plus petit",
         memeContenu(
           trierClassementParVolume([{ volume_total: 50 }, { volume_total: 130 }, { volume_total: 90 }]),
           [{ volume_total: 130 }, { volume_total: 90 }, { volume_total: 50 }]
         ));
 
-      // --- Fonction transverse ---
-      verifier("formaterMontant ajoute FCFA",
-        formaterMontant(23000) === "23000 FCFA");
+      verifier("formaterDate convertit AAAA-MM-JJ en JJ/MM/AAAA",
+        formaterDate("2026-07-12") === "12/07/2026");
 
     } catch (e) {
       verifier("Une fonction plante : " + e.message, false);

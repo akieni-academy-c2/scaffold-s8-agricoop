@@ -19,6 +19,11 @@
     <form id="form-paiement">
       <select id="p-membre"><option value="">-- Choisir un membre --</option></select>
       <input type="number" id="p-montant" min="1" placeholder="Montant (FCFA)">
+      <select id="p-mode-paiement">
+        <option value="">-- Mode de paiement --</option>
+        <option value="Espèces">Espèces</option>
+        <option value="Mobile Money">Mobile Money</option>
+      </select>
       <button type="submit">Enregistrer</button>
     </form>
 
@@ -34,7 +39,7 @@
 
     <table>
       <thead>
-        <!-- TODO (Dev FS4) : en-têtes (Membre, Montant, Date) -->
+        <!-- TODO (Dev FS4) : en-têtes (Membre, Montant, Mode de paiement, Date) -->
       </thead>
       <tbody id="liste-paiements"></tbody>
     </table>

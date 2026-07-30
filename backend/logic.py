@@ -12,17 +12,21 @@ RENVOYER un résultat. Pas de print, pas de input, pas de requête réseau,
 pas de Flask, pas de base de données. Juste : des paramètres entrent, une
 valeur sort.
 
-Le fichier est découpé en 3 zones de responsabilité. Si vous êtes 2 Data
-Scientists, répartissez-vous les 3 zones à deux (par exemple une personne
-prend la zone C entièrement, l'autre les zones A et B). Si vous êtes 3,
-une zone chacun.
+Le fichier est découpé en 4 zones de responsabilité. Si vous êtes 2 Data
+Scientists, une répartition équilibrée est : Personne 1 = Zone A + Zone C
+(11 fonctions), Personne 2 = Zone B + Zone D (9 fonctions). Si vous êtes 3 :
+Personne 1 = Zone A (6), Personne 2 = Zone B (7), Personne 3 = Zone C + D (7).
 
-  - ZONE A : Tableau de bord & Statistiques   — 6 fonctions
-  - ZONE B : Membres & Livraisons              — 5 fonctions
+  - ZONE A : Tableau de bord & Statistiques    — 6 fonctions
+  - ZONE B : Membres & Livraisons              — 7 fonctions
   - ZONE C : Ventes, Stock & Paiements         — 5 fonctions
+  - ZONE D : Authentification (NOUVEAU)        — 2 fonctions
 
-Référentiels de prix (mêmes valeurs que le jeu de données standard) :
-  PRIX_ACHAT_KG et PRIX_VENTE_KG sont déjà définis ci-dessous, réutilisez-les.
+Référentiels déjà définis ci-dessous, réutilisez-les :
+  PRIX_ACHAT_KG, PRIX_VENTE_KG : prix par culture (mêmes valeurs que le
+  jeu de données standard).
+  ACTIONS_PAR_ROLE : ce que chaque rôle a le droit de faire (module
+  Authentification).
 
 Quand vos fonctions sont correctes :
   1. les tests passent au vert   (python -m pytest -v, depuis backend/)
@@ -42,6 +46,18 @@ PRIX_VENTE_KG = {
     "Manioc": 220,
     "Maïs": 280,
     "Arachide": 500,
+}
+
+# Ce que chaque rôle a le droit de faire (module Authentification).
+# Un "rôle" correspond à un type d'utilisateur connecté ; une "action" est
+# une opération précise de l'application. Si l'action demandée n'apparaît
+# pas dans la liste du rôle, l'accès doit être refusé .
+ACTIONS_PAR_ROLE = {
+    "Secrétaire": ["gerer_comptes", "gerer_membres", "tableau_de_bord", "consulter_rapport_partenaire"],
+    "Président": ["enregistrer_vente", "tableau_de_bord", "generer_rapport_partenaire"],
+    "Trésorière": ["enregistrer_paiement", "tableau_de_bord"],
+    "Responsable dépôt": ["enregistrer_livraison", "tableau_de_bord"],
+    "Membre": ["consulter_fiche_membre"],
 }
 
 
@@ -83,8 +99,20 @@ def calculer_indicateurs_globaux(livraisons, ventes, paiements):
             "nb_livraisons_mois": 2
         }
     """
-        # TODO : à compléter
-    pass
+    total_livre = sum(l["quantite"] for l in livraisons)
+    total_vendu = sum(v["quantite"] for v in ventes)
+    stock_total = total_livre - total_vendu
+    valeur_livraisons = sum(
+        l["quantite"] * PRIX_ACHAT_KG.get(l["culture"], 0)
+        for l in livraisons
+    )
+    total_paiements = sum(p["montant"] for p in paiements)
+    return {
+        "stock_total": stock_total,
+        "montant_du_total": valeur_livraisons - total_paiements,
+        "nb_membres_actifs": len({l["membre_id"] for l in livraisons}),
+        "nb_livraisons_mois": len(livraisons),
+    }
 
 
 def calculer_livraisons_par_jour_semaine(livraisons):
@@ -103,8 +131,11 @@ def calculer_livraisons_par_jour_semaine(livraisons):
         entrée -> [{"date": "2026-07-08", "quantite": 40}, {"date": "2026-07-08", "quantite": 10}]
         sortie -> {"2026-07-08": 50}
     """
-    # TODO : à compléter
-    pass
+    resultat = {}
+    for livraison in livraisons:
+        date = livraison["date"]
+        resultat[date] = resultat.get(date, 0) + livraison["quantite"]
+    return resultat
 
 
 def classer_membres_par_production(livraisons):
@@ -131,6 +162,7 @@ def classer_membres_par_production(livraisons):
             {"membre_id": 1, "quantite": 100},
             {"membre_id": 2, "quantite": 50},
             {"membre_id": 1, "quantite": 30},
+            
         ]
         -> le membre 1 a livré 100 + 30 = 130 au total
         -> le membre 2 a livré 50 au total
@@ -140,8 +172,16 @@ def classer_membres_par_production(livraisons):
             {"membre_id": 2, "volume_total": 50},
         ]
     """
-    # TODO : à compléter
-    pass
+    totaux = {}
+    for livraison in livraisons:
+        membre_id = livraison["membre_id"]
+        totaux[membre_id] = totaux.get(membre_id, 0) + livraison["quantite"]
+    resultat = [
+        {"membre_id": membre_id, "volume_total": volume_total}
+        for membre_id, volume_total in totaux.items()
+    ]
+    resultat.sort(key=lambda membre: membre["volume_total"], reverse=True)
+    return resultat
 
 
 def calculer_statistiques_globales(livraisons, ventes):
@@ -176,8 +216,16 @@ def calculer_statistiques_globales(livraisons, ventes):
 
         sortie -> {"Manioc": {"volume_total": 100, "valeur_totale": 11000}}
     """
-    # TODO : à compléter
-    pass
+    resultat = {}
+    for livraison in livraisons:
+        culture = livraison["culture"]
+        resultat.setdefault(culture, {"volume_total": 0, "valeur_totale": 0})
+        resultat[culture]["volume_total"] += livraison["quantite"]
+    for vente in ventes:
+        culture = vente["culture"]
+        resultat.setdefault(culture, {"volume_total": 0, "valeur_totale": 0})
+        resultat[culture]["valeur_totale"] += vente["quantite"] * vente["prix_kg"]
+    return resultat
 
 
 def generer_indicateurs_rapport_bailleur(livraisons, ventes, paiements):
@@ -222,8 +270,18 @@ def generer_indicateurs_rapport_bailleur(livraisons, ventes, paiements):
         sortie -> {"volume_total_periode": 150, "montant_ventes_periode": 17600,
                    "taux_regularite_paiements": 50, "nb_membres_actifs": 2}
     """
-    # TODO : à compléter
-    pass
+    membres_actifs = {livraison["membre_id"] for livraison in livraisons}
+    membres_payes = {paiement["membre_id"] for paiement in paiements}
+    nb_membres_actifs = len(membres_actifs)
+    taux = 0 if not nb_membres_actifs else round(
+        len(membres_actifs & membres_payes) / nb_membres_actifs * 100
+    )
+    return {
+        "volume_total_periode": sum(l["quantite"] for l in livraisons),
+        "montant_ventes_periode": sum(v["quantite"] * v["prix_kg"] for v in ventes),
+        "taux_regularite_paiements": taux,
+        "nb_membres_actifs": nb_membres_actifs,
+    }
 
 
 def identifier_top_acheteur(ventes, acheteurs):
@@ -247,8 +305,15 @@ def identifier_top_acheteur(ventes, acheteurs):
         acheteurs -> [{"id": 1, "nom": "Christiane Nkaya"}, {"id": 2, "nom": "Talangaï"}]
         sortie    -> {"acheteur_nom": "Christiane Nkaya", "volume_total": 150}
     """
-    # TODO : à compléter
-    pass
+    if not ventes:
+        return {"acheteur_nom": None, "volume_total": 0}
+    totaux = {}
+    for vente in ventes:
+        acheteur_id = vente["acheteur_id"]
+        totaux[acheteur_id] = totaux.get(acheteur_id, 0) + vente["quantite"]
+    top_id = max(totaux, key=totaux.get)
+    noms = {acheteur["id"]: acheteur["nom"] for acheteur in acheteurs}
+    return {"acheteur_nom": noms.get(top_id), "volume_total": totaux[top_id]}
 
 
 # ========================================================================
@@ -297,8 +362,17 @@ def calculer_solde_membre(membre_id, livraisons, paiements):
 
         sortie -> 23000
     """
-    # TODO : à compléter
-    pass
+    total_du = sum(
+        livraison["quantite"] * PRIX_ACHAT_KG.get(livraison["culture"], 0)
+        for livraison in livraisons
+        if livraison["membre_id"] == membre_id
+    )
+    total_paye = sum(
+        paiement["montant"]
+        for paiement in paiements
+        if paiement["membre_id"] == membre_id
+    )
+    return total_du - total_paye
 
 
 def detecter_membres_inactifs(membres, livraisons, jours_seuil=90):
@@ -328,8 +402,12 @@ def detecter_membres_inactifs(membres, livraisons, jours_seuil=90):
 
         sortie -> [{"membre_id": 2, "nom": "Sandra Malonga"}]
     """
-    # TODO : à compléter
-    pass
+    membres_avec_livraison = {livraison["membre_id"] for livraison in livraisons}
+    return [
+        {"membre_id": membre["id"], "nom": membre["nom"]}
+        for membre in membres
+        if membre["id"] not in membres_avec_livraison
+    ]
 
 
 def detecter_anomalie_livraison(livraison):
@@ -363,8 +441,14 @@ def detecter_anomalie_livraison(livraison):
         livraison = {"membre_id": 1, "culture": "Manioc", "quantite": 100}
         sortie -> []
     """
-    # TODO : à compléter
-    pass
+    anomalies = []
+    if livraison.get("quantite", 0) <= 0:
+        anomalies.append("Quantité invalide : doit être strictement positive.")
+    if livraison.get("culture") not in PRIX_ACHAT_KG:
+        anomalies.append(f"Culture inconnue : {livraison.get('culture')}.")
+    if not livraison.get("membre_id"):
+        anomalies.append("Aucun membre rattaché à cette livraison.")
+    return anomalies
 
 
 def generer_recu(membre_nom, montant):
@@ -385,8 +469,9 @@ def generer_recu(membre_nom, montant):
         generer_recu("Jean Mabiala", 0)
           -> "Aucun montant à verser pour Jean Mabiala."
     """
-    # TODO : à compléter
-    pass
+    if montant <= 0:
+        return f"Aucun montant à verser pour {membre_nom}."
+    return f"Reçu - {membre_nom} : paiement de {montant} FCFA effectué."
 
 
 def calculer_historique_paiements_membre(membre_id, paiements):
@@ -410,8 +495,95 @@ def calculer_historique_paiements_membre(membre_id, paiements):
         sortie    -> [{"membre_id": 1, "montant": 15000, "date": "2026-07-14"},
                       {"membre_id": 1, "montant": 5000, "date": "2026-07-05"}]
     """
-    # TODO : à compléter
-    pass
+    historique = [p for p in paiements if p["membre_id"] == membre_id]
+    historique.sort(key=lambda paiement: paiement["date"], reverse=True)
+    return historique
+
+
+def rechercher_membre_similaire(nom_complet, membres):
+    """
+    NOUVELLE FONCTION — recherche tolérante de doublon (RM-7 du FRD) :
+    avant de créer un nouveau membre, on vérifie qu'un membre au nom
+    quasi identique n'existe pas déjà, pour éviter les doublons créés par
+    une simple différence de majuscules ou d'espaces.
+
+    Paramètres :
+        nom_complet : str — le nom complet saisi dans le formulaire,
+            ex. "  jean MABIALA " (avec espaces ou casse irrégulière
+            possibles, comme le ferait une vraie saisie utilisateur)
+        membres : liste de dict, chacun avec au moins "nom" (str)
+
+    Retourne :
+        le dictionnaire du membre existant si son "nom", une fois
+        normalisé (mis en minuscules, espaces de début/fin retirés,
+        espaces multiples réduits à un seul espace), correspond
+        EXACTEMENT au nom_complet donné (lui aussi normalisé de la même
+        façon). Retourne None si aucune correspondance.
+
+    Indication : pour "réduire les espaces multiples à un seul", vous
+    pouvez utiliser " ".join(texte.split()) — .split() sans argument
+    découpe déjà sur n'importe quelle suite d'espaces et ignore les
+    espaces de bord.
+
+    Exemple :
+        membres = [{"id": 1, "nom": "Jean Mabiala"}, {"id": 2, "nom": "Alphonsine Nkounkou"}]
+
+        rechercher_membre_similaire("  jean   MABIALA ", membres)
+        -> {"id": 1, "nom": "Jean Mabiala"}   (même nom une fois normalisé)
+
+        rechercher_membre_similaire("Marie Koumba", membres)
+        -> None   (aucun membre existant ne porte ce nom)
+    """
+    cible = " ".join(nom_complet.split()).lower()
+    for membre in membres:
+        candidat = " ".join(membre["nom"].split()).lower()
+        if candidat == cible:
+            return membre
+    return None
+
+
+def valider_nouveau_membre(donnees):
+    """
+     — vérifie que le formulaire de création d'un
+    nouveau membre est complet avant de l'enregistrer.
+
+    Paramètre :
+        donnees : dict avec les clés "nom", "prenom", "village", "contact"
+            (valeurs potentiellement vides ou manquantes — c'est
+            justement ce qu'on vérifie)
+
+    Retourne :
+        une liste de chaînes de caractères décrivant chaque anomalie
+        détectée (liste VIDE si tout est correct).
+
+    Règles à vérifier (un formulaire peut cumuler plusieurs anomalies) :
+        - "nom" ne doit pas être vide (après avoir retiré les espaces
+          de début/fin) sinon ajouter : "Le nom est obligatoire."
+        - "prenom" ne doit pas être vide sinon ajouter :
+          "Le prénom est obligatoire."
+        - "village" ne doit pas être vide sinon ajouter :
+          "Le village est obligatoire."
+        - "contact" ne doit pas être vide sinon ajouter :
+          "Le contact est obligatoire."
+
+    Exemple 1 (formulaire incomplet) :
+        donnees = {"nom": "Koumba", "prenom": "", "village": "Séo", "contact": ""}
+        sortie -> ["Le prénom est obligatoire.", "Le contact est obligatoire."]
+
+    Exemple 2 (formulaire valide) :
+        donnees = {"nom": "Koumba", "prenom": "Marie", "village": "Séo", "contact": "064111222"}
+        sortie -> []
+    """
+    anomalies = []
+    if not donnees.get("nom", "").strip():
+        anomalies.append("Le nom est obligatoire.")
+    if not donnees.get("prenom", "").strip():
+        anomalies.append("Le prénom est obligatoire.")
+    if not donnees.get("village", "").strip():
+        anomalies.append("Le village est obligatoire.")
+    if not donnees.get("contact", "").strip():
+        anomalies.append("Le contact est obligatoire.")
+    return anomalies
 
 
 # ========================================================================
@@ -444,8 +616,14 @@ def calculer_stock_disponible(livraisons, ventes):
 
         sortie -> {"Manioc": 70, "Maïs": 0, "Arachide": 0}
     """
-    # TODO : à compléter
-    pass
+    stock = {culture: 0 for culture in PRIX_ACHAT_KG}
+    for livraison in livraisons:
+        if livraison["culture"] in stock:
+            stock[livraison["culture"]] += livraison["quantite"]
+    for vente in ventes:
+        if vente["culture"] in stock:
+            stock[vente["culture"]] -= vente["quantite"]
+    return stock
 
 
 def verifier_stock_avant_vente(vente, stock_disponible):
@@ -474,8 +652,7 @@ def verifier_stock_avant_vente(vente, stock_disponible):
                                     {"Manioc": 50})
           -> True  (cas limite : égalité exacte, la vente est acceptée)
     """
-    # TODO : à compléter
-    pass
+    return vente["quantite"] <= stock_disponible.get(vente["culture"], 0)
 
 
 def calculer_marge_vente(vente):
@@ -502,8 +679,8 @@ def calculer_marge_vente(vente):
 
         sortie -> 10500
     """
-    # TODO : à compléter
-    pass
+    prix_achat_reference = PRIX_ACHAT_KG.get(vente["culture"], 0)
+    return (vente["prix_kg"] - prix_achat_reference) * vente["quantite"]
 
 
 def verifier_paiement_valide(paiement, solde_du):
@@ -530,8 +707,13 @@ def verifier_paiement_valide(paiement, solde_du):
         paiement={"montant": 50000}, solde_du=20000
         -> ["Le montant dépasse le solde dû (20000 FCFA)."]
     """
-    # TODO : à compléter
-    pass
+    anomalies = []
+    montant = paiement.get("montant", 0)
+    if montant <= 0:
+        anomalies.append("Le montant doit être strictement positif.")
+    if montant > solde_du:
+        anomalies.append(f"Le montant dépasse le solde dû ({solde_du} FCFA).")
+    return anomalies
 
 
 def calculer_moyenne_prix_vente(ventes, culture):
@@ -567,5 +749,91 @@ def calculer_moyenne_prix_vente(ventes, culture):
 
         sortie -> 210
     """
-    # TODO : à compléter
-    pass
+    ventes_culture = [vente for vente in ventes if vente["culture"] == culture]
+    if not ventes_culture:
+        return 0
+    total_quantite = sum(vente["quantite"] for vente in ventes_culture)
+    total_valeur = sum(
+        vente["quantite"] * vente["prix_kg"] for vente in ventes_culture
+    )
+    return round(total_valeur / total_quantite)
+
+
+# ========================================================================
+# ZONE D — Authentification (nouveau module)
+# ========================================================================
+
+def authentifier_utilisateur(nom_utilisateur, mot_de_passe, utilisateurs):
+    """
+    NOUVELLE FONCTION — vérifie les identifiants saisis sur l'écran de
+    connexion et retourne le profil de l'utilisateur s'ils sont corrects
+    (module Authentification, section 3.1 du FRD, scénario nominal
+    étapes 1 et 4).
+
+    Paramètres :
+        nom_utilisateur : str — identifiant saisi
+        mot_de_passe    : str — mot de passe saisi
+        utilisateurs    : liste de dict, chacun avec les clés
+            "nom_utilisateur" (str), "mot_de_passe" (str), "role" (str),
+            "nom_complet" (str), "membre_id" (int ou None)
+
+    Retourne :
+        - si un utilisateur de la liste a EXACTEMENT ce nom_utilisateur
+          ET ce mot_de_passe : un dictionnaire avec les clés
+          "nom_utilisateur", "role", "nom_complet" et "membre_id"
+          — SANS la clé "mot_de_passe" (on ne renvoie jamais un mot de
+          passe, même correct, dans le résultat).
+        - si aucun utilisateur ne correspond : None
+
+    Exemple :
+        utilisateurs = [
+            {"nom_utilisateur": "smalonga", "mot_de_passe": "Secretaire2026",
+             "role": "Secrétaire", "nom_complet": "Sandra Malonga", "membre_id": 4}
+        ]
+
+        authentifier_utilisateur("smalonga", "Secretaire2026", utilisateurs)
+        -> {"nom_utilisateur": "smalonga", "role": "Secrétaire",
+            "nom_complet": "Sandra Malonga", "membre_id": 4}
+
+        authentifier_utilisateur("smalonga", "mauvais_mdp", utilisateurs)
+        -> None
+    """
+    for utilisateur in utilisateurs:
+        if (
+            utilisateur["nom_utilisateur"] == nom_utilisateur
+            and utilisateur["mot_de_passe"] == mot_de_passe
+        ):
+            return {
+                "nom_utilisateur": utilisateur["nom_utilisateur"],
+                "role": utilisateur["role"],
+                "nom_complet": utilisateur["nom_complet"],
+                "membre_id": utilisateur["membre_id"],
+            }
+    return None
+
+
+def verifier_acces_role(role, action):
+    """
+    NOUVELLE FONCTION — vérifie qu'un rôle a le droit d'effectuer une
+    action donnée (règle métier RM-6 du FRD : accès refusé si hors du
+    rôle). Utilise le dictionnaire ACTIONS_PAR_ROLE défini en haut de ce
+    fichier — ne recopiez pas les permissions, lisez-les depuis cette
+    constante.
+
+    Paramètres :
+        role   : str — un des rôles définis dans ACTIONS_PAR_ROLE
+            (ex. "Trésorière"). Si ce rôle n'existe pas dans
+            ACTIONS_PAR_ROLE, considérez qu'il n'a aucun droit.
+        action : str — l'action demandée (ex. "enregistrer_paiement")
+
+    Retourne :
+        True  si action fait partie de la liste des actions autorisées
+              pour ce role dans ACTIONS_PAR_ROLE
+        False sinon (rôle inconnu, ou action non listée pour ce rôle)
+
+    Exemple :
+        verifier_acces_role("Trésorière", "enregistrer_paiement") -> True
+        verifier_acces_role("Trésorière", "enregistrer_vente")    -> False
+        verifier_acces_role("Livreur",    "tableau_de_bord")      -> False  (rôle inconnu)
+    """
+    return action in ACTIONS_PAR_ROLE.get(role, [])

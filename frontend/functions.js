@@ -3,11 +3,10 @@
    =====================================================================
    AgriCoop Connect — Coopérative COMAKI, Kintélé
 
-   Vous êtes 5 devs Full Stack. Chacun possède une page principale (voir
-   README.md) et complète 2 fonctions ci-dessous : une liée directement
-   à sa page, une seconde plus transverse. Ce fichier reste un travail
-   SECONDAIRE : l'essentiel de votre note porte sur vos pages (structure,
-   responsive, box model, Flexbox/Grid).
+   Vous êtes 6 devs Full Stack. Chacun possède une ou deux pages
+   principales (voir README.md) et complète 2 ou 3 fonctions ci-dessous.
+   Ce fichier reste un travail SECONDAIRE : l'essentiel de votre note
+   porte sur vos pages (structure, responsive, box model, Flexbox/Grid).
 
    Règle d'or : une fonction reçoit des paramètres et RENVOIE (return)
    un résultat. Pas de document.querySelector ici, pas de fetch.
@@ -21,6 +20,22 @@
    ===================================================================== */
 
 
+/* [Dev FS1 — Connexion — niveau S7 : conditions simples]
+   Vérifie qu'un formulaire de connexion est valide avant de l'envoyer au
+   serveur (module Authentification, nouveau).
+   Paramètre : donnees, un objet avec les clés :
+     nom_utilisateur (chaîne), mot_de_passe (chaîne)
+   Règles :
+     - nom_utilisateur ne doit pas être vide (après avoir retiré les
+       espaces de début/fin)
+     - mot_de_passe ne doit pas être vide
+   Retourne : true si tout est valide, false sinon.
+   Astuce   : "  ".trim() donne une chaîne vide "". */
+function validerFormulaireLogin(donnees) {
+  // TODO : à compléter
+}
+
+
 /* [Dev FS1 — Tableau de bord — niveau S7 : boucle + condition]
    Compte le nombre de jours (parmi les entrées reçues) où le volume
    livré dépasse un seuil donné — utile pour repérer les pics d'activité.
@@ -29,17 +44,6 @@
    Exemple    : compterJoursActifs({"2026-07-08": 135, "2026-07-09": 60}, 100) -> 1
    Astuce     : Object.values(livraisonsParJour) donne un tableau des quantités. */
 function compterJoursActifs(livraisonsParJour, seuil) {
-  // TODO : à compléter
-}
-
-
-/* [Dev FS1 — fonction transverse — niveau S8 : propriétés d'objet + formatage]
-   Met en forme une date au format "AAAA-MM-JJ" en "JJ/MM/AAAA", utilisée
-   sur plusieurs pages (livraisons, paiements, ventes).
-   Paramètre : dateStr (chaîne, ex. "2026-07-12")
-   Retourne  : une chaîne au format "12/07/2026".
-   Astuce    : dateStr.split("-") donne ["2026", "07", "12"]. */
-function formaterDate(dateStr) {
   // TODO : à compléter
 }
 
@@ -63,6 +67,22 @@ function filtrerMembresParStatut(membres, statut) {
                 tous les membres tels quels.
    Astuce     : "Jean Mabiala".toLowerCase().includes("jean") -> true */
 function rechercherMembreParNom(membres, texte) {
+  // TODO : à compléter
+}
+
+
+/* [Dev FS2 — Membres — niveau S7 : conditions simples — NOUVEAU]
+   Vérifie qu'un formulaire de création de nouveau membre est valide
+   avant de l'envoyer au serveur (module Membres, section 4.1 du FRD).
+   Paramètre : donnees, un objet avec les clés :
+     nom (chaîne), prenom (chaîne), village (chaîne), contact (chaîne)
+   Règles : chacun des 4 champs doit être non vide après .trim()
+   Retourne : un objet {valide: true/false, erreurs: [liste de messages]}
+   Exemple  : validerFormulaireNouveauMembre({nom:"Koumba", prenom:"",
+              village:"Séo", contact:""})
+              -> {valide: false, erreurs: ["Le prénom est obligatoire.",
+                                            "Le contact est obligatoire."]} */
+function validerFormulaireNouveauMembre(donnees) {
   // TODO : à compléter
 }
 
@@ -99,10 +119,11 @@ function trierLivraisonsParDate(livraisons) {
    (règles simples côté formulaire — la vraie règle métier "ne dépasse
    pas le solde dû" est vérifiée côté serveur par Data Science).
    Paramètre : donnees, un objet avec les clés :
-     membre_id (chaîne ou nombre), montant (chaîne)
+     membre_id (chaîne ou nombre), montant (chaîne), mode_paiement (chaîne)
    Règles :
      - membre_id ne doit pas être vide
      - montant doit être un nombre strictement supérieur à 0
+     - mode_paiement doit être "Espèces" ou "Mobile Money"
    Retourne : true si tout est valide, false sinon. */
 function validerFormulairePaiement(donnees) {
   // TODO : à compléter
@@ -133,17 +154,7 @@ function getBadgeStock(quantiteDisponible) {
 }
 
 
-/* [Dev FS5 — Statistiques — niveau S8 : tableau .sort]
-   Trie le classement des membres par volume total, du plus gros
-   producteur au plus petit (ordre décroissant).
-   Paramètre : classement (tableau d'objets), chaque élément a .volume_total (nombre)
-   Retourne  : le tableau trié par .volume_total décroissant. */
-function trierClassementParVolume(classement) {
-  // TODO : à compléter
-}
-
-
-/* [Fonction transverse — niveau S8 : propriétés d'objet + formatage]
+/* [Dev FS5 — fonction transverse — niveau S8 : propriétés d'objet + formatage]
    Met en forme un montant en FCFA, utilisée sur presque toutes les pages
    (tableau de bord, membres, livraisons, paiements).
    Paramètre : montant (nombre)
@@ -154,13 +165,36 @@ function formaterMontant(montant) {
 }
 
 
+/* [Dev FS6 — Statistiques — niveau S8 : tableau .sort]
+   Trie le classement des membres par volume total, du plus gros
+   producteur au plus petit (ordre décroissant).
+   Paramètre : classement (tableau d'objets), chaque élément a .volume_total (nombre)
+   Retourne  : le tableau trié par .volume_total décroissant. */
+function trierClassementParVolume(classement) {
+  // TODO : à compléter
+}
+
+
+/* [Dev FS6 — fonction transverse — niveau S8 : propriétés d'objet + formatage]
+   Met en forme une date au format "AAAA-MM-JJ" en "JJ/MM/AAAA", utilisée
+   sur plusieurs pages (livraisons, paiements, ventes).
+   Paramètre : dateStr (chaîne, ex. "2026-07-12")
+   Retourne  : une chaîne au format "12/07/2026".
+   Astuce    : dateStr.split("-") donne ["2026", "07", "12"]. */
+function formaterDate(dateStr) {
+  // TODO : à compléter
+}
+
+
 /* NE PAS MODIFIER — rend vos fonctions accessibles à main.js et aux tests */
 if (typeof module !== "undefined") {
   module.exports = {
+    validerFormulaireLogin,
     compterJoursActifs,
     formaterDate,
     filtrerMembresParStatut,
     rechercherMembreParNom,
+    validerFormulaireNouveauMembre,
     validerFormulaireLivraison,
     trierLivraisonsParDate,
     validerFormulairePaiement,

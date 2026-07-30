@@ -11,6 +11,80 @@
 
 const API_URL = "http://localhost:5000/api";
 
+/* ---------- SESSION (utilisée sur toutes les pages) -------------------- */
+const CLE_SESSION = "agricoop_utilisateur";
+
+function obtenirUtilisateurConnecte() {
+  const brut = localStorage.getItem(CLE_SESSION);
+  return brut ? JSON.parse(brut) : null;
+}
+
+function enregistrerUtilisateurConnecte(utilisateur) {
+  localStorage.setItem(CLE_SESSION, JSON.stringify(utilisateur));
+}
+
+function deconnecterUtilisateur() {
+  localStorage.removeItem(CLE_SESSION);
+  window.location.href = "../login/login.html";
+}
+
+function initBarreSession() {
+  const utilisateur = obtenirUtilisateurConnecte();
+  const cible = document.getElementById("utilisateur-connecte");
+  if (cible) {
+    cible.textContent = utilisateur
+      ? `Connecté(e) : ${utilisateur.nom_complet} (${utilisateur.role})`
+      : "Non connecté(e)";
+  }
+  const btnDeconnexion = document.getElementById("btn-deconnexion");
+  if (btnDeconnexion) {
+    btnDeconnexion.addEventListener("click", deconnecterUtilisateur);
+  }
+}
+
+/* ---------- CONNEXION (login.html) -------------------------------------- */
+function initLogin() {
+  const form = document.getElementById("form-login");
+  if (!form) return;
+
+  form.addEventListener("submit", async (evt) => {
+    evt.preventDefault();
+    const donnees = {
+      nom_utilisateur: document.getElementById("l-nom-utilisateur").value,
+      mot_de_passe: document.getElementById("l-mot-de-passe").value,
+    };
+    const messageErreur = document.getElementById("message-erreur-login");
+
+    if (!validerFormulaireLogin(donnees)) {
+      messageErreur.textContent = "Merci de remplir les deux champs.";
+      messageErreur.hidden = false;
+      return;
+    }
+    messageErreur.hidden = true;
+
+    try {
+      const reponse = await fetch(`${API_URL}/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(donnees),
+      });
+      const resultat = await reponse.json();
+
+      if (resultat.succes) {
+        enregistrerUtilisateurConnecte(resultat.utilisateur);
+        window.location.href = "../dashboard/dashboard.html";
+      } else {
+        messageErreur.textContent = resultat.erreur || "Connexion refusée.";
+        messageErreur.hidden = false;
+      }
+    } catch (e) {
+      messageErreur.textContent = "Impossible de contacter le serveur.";
+      messageErreur.hidden = false;
+      console.error(e);
+    }
+  });
+}
+
 /* ---------- TABLEAU DE BORD (index.html) ------------------------------ */
 async function initDashboard() {
   const cible = document.getElementById("dashboard-cartes");
@@ -116,6 +190,8 @@ function afficherMembres(membres) {
       return `
       <article class="membre-ligne">
         <strong>${m.nom}</strong>
+        <span class="village">${m.village || ""}</span>
+        <span class="contact">${m.contact || ""}</span>
         <span class="badge ${classeStatut}">${m.statut_cotisation}</span>
         <span>${formaterMontant(m.solde)}</span>
       </article>`;
@@ -240,6 +316,7 @@ async function chargerPaiements() {
       <tr>
         <td>${p.membre_nom}</td>
         <td>${formaterMontant(p.montant)}</td>
+        <td>${p.mode_paiement || ""}</td>
         <td>${formaterDate(p.date)}</td>
       </tr>`
       )
@@ -264,6 +341,7 @@ function initFormPaiement() {
     const donnees = {
       membre_id: Number(document.getElementById("p-membre").value),
       montant: document.getElementById("p-montant").value,
+      mode_paiement: document.getElementById("p-mode-paiement").value,
     };
 
     const messageErreur = document.getElementById("message-erreur-paiement");
@@ -433,11 +511,169 @@ async function initRapportBailleur() {
   }
 }
 
+/* ---------- COMPTES (comptes.html) — réservé à la Secrétaire ----------- */
+async function initComptes() {
+  const form = document.getElementById("form-nouveau-compte");
+  const listeCible = document.getElementById("liste-comptes");
+  const accesRefuse = document.getElementById("acces-refuse-comptes");
+  if (!form && !listeCible) return;
+
+  const utilisateur = obtenirUtilisateurConnecte();
+  if (!utilisateur) {
+    if (accesRefuse) {
+      accesRefuse.textContent = "Vous devez être connecté(e) pour accéder à cette page.";
+      accesRefuse.hidden = false;
+    }
+    if (form) form.hidden = true;
+    return;
+  }
+
+  try {
+    const reponseAcces = await fetch(`${API_URL}/verifier-acces`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ role: utilisateur.role, action: "gerer_comptes" }),
+    });
+    const acces = await reponseAcces.json();
+    if (!acces.autorise) {
+      if (accesRefuse) {
+        accesRefuse.textContent = "Accès réservé à la Secrétaire.";
+        accesRefuse.hidden = false;
+      }
+      if (form) form.hidden = true;
+      return;
+    }
+  } catch (e) {
+    console.error("Vérification d'accès impossible :", e);
+    return;
+  }
+
+  async function chargerComptes() {
+    if (!listeCible) return;
+    try {
+      const reponse = await fetch(`${API_URL}/utilisateurs`);
+      const comptes = await reponse.json();
+      listeCible.innerHTML = comptes
+        .map((c) => `<tr><td>${c.nom_utilisateur}</td><td>${c.nom_complet}</td><td>${c.role}</td></tr>`)
+        .join("");
+    } catch (e) {
+      listeCible.innerHTML = "<tr><td colspan='3'>Impossible de charger les comptes.</td></tr>";
+      console.error(e);
+    }
+  }
+  chargerComptes();
+
+  if (form) {
+    form.addEventListener("submit", async (evt) => {
+      evt.preventDefault();
+      const donnees = {
+        nom_utilisateur: document.getElementById("c-nom-utilisateur").value,
+        mot_de_passe: document.getElementById("c-mot-de-passe").value,
+        nom_complet: document.getElementById("c-nom-complet").value,
+        role: document.getElementById("c-role").value,
+      };
+      const messageErreur = document.getElementById("message-erreur-compte");
+      const messageSucces = document.getElementById("message-succes-compte");
+
+      try {
+        const reponse = await fetch(`${API_URL}/utilisateurs`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(donnees),
+        });
+        const resultat = await reponse.json();
+
+        if (resultat.succes) {
+          messageSucces.textContent = `Compte créé pour ${resultat.utilisateur.nom_complet}.`;
+          messageSucces.hidden = false;
+          messageErreur.hidden = true;
+          form.reset();
+          chargerComptes();
+        } else {
+          messageErreur.textContent = resultat.erreur;
+          messageErreur.hidden = false;
+          messageSucces.hidden = true;
+        }
+      } catch (e) {
+        messageErreur.textContent = "Impossible de contacter le serveur.";
+        messageErreur.hidden = false;
+        console.error(e);
+      }
+    });
+  }
+}
+
+/* ---------- NOUVEAU MEMBRE (membres.html) ------------------------------ */
+async function initNouveauMembre() {
+  const form = document.getElementById("form-nouveau-membre");
+  if (!form) return;
+
+  const selectVillage = document.getElementById("nm-village");
+  if (selectVillage) {
+    try {
+      const reponse = await fetch(`${API_URL}/villages`);
+      const villages = await reponse.json();
+      selectVillage.innerHTML = `<option value="">-- Choisir un village --</option>` +
+        villages.map((v) => `<option value="${v}">${v}</option>`).join("");
+    } catch (e) {
+      console.error("Impossible de charger les villages :", e);
+    }
+  }
+
+  form.addEventListener("submit", async (evt) => {
+    evt.preventDefault();
+    const donnees = {
+      prenom: document.getElementById("nm-prenom").value,
+      nom: document.getElementById("nm-nom").value,
+      village: document.getElementById("nm-village").value,
+      contact: document.getElementById("nm-contact").value,
+    };
+    const erreursCible = document.getElementById("erreurs-nouveau-membre");
+    const succesCible = document.getElementById("message-succes-nouveau-membre");
+
+    const validation = validerFormulaireNouveauMembre(donnees);
+    if (!validation.valide) {
+      erreursCible.innerHTML = "<ul>" + validation.erreurs.map((e) => `<li>${e}</li>`).join("") + "</ul>";
+      erreursCible.hidden = false;
+      succesCible.hidden = true;
+      return;
+    }
+    erreursCible.hidden = true;
+
+    try {
+      const reponse = await fetch(`${API_URL}/membres`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(donnees),
+      });
+      const resultat = await reponse.json();
+
+      if (resultat.succes) {
+        succesCible.textContent = `Membre créé : ${resultat.membre.nom}.`;
+        succesCible.hidden = false;
+        form.reset();
+        initMembres();
+      } else {
+        erreursCible.innerHTML = "<ul>" + resultat.anomalies.map((a) => `<li>${a}</li>`).join("") + "</ul>";
+        erreursCible.hidden = false;
+        succesCible.hidden = true;
+      }
+    } catch (e) {
+      erreursCible.textContent = "Impossible de contacter le serveur.";
+      erreursCible.hidden = false;
+      console.error(e);
+    }
+  });
+}
+
 /* ---------- Démarrage automatique ------------------------------------ */
 window.addEventListener("DOMContentLoaded", () => {
+  initBarreSession();
+  initLogin();
   initDashboard();
   initMembres();
   initFiltresMembres();
+  initNouveauMembre();
   chargerLivraisons();
   initFormLivraison();
   initTriLivraisons();
@@ -446,4 +682,5 @@ window.addEventListener("DOMContentLoaded", () => {
   initVentesStock();
   initStatistiques();
   initRapportBailleur();
+  initComptes();
 });

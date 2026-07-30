@@ -34,6 +34,26 @@
          *** NE PAS MODIFIER l'id ci-dessous — main.js l'utilise ***
          ===================================================================== -->
     <div id="liste-membres"></div>
+
+    <!-- =====================================================================
+         NOUVEAU MEMBRE — TODO (Dev FS2)
+         Construire le formulaire de création d'un membre (module Membres,
+         nouveau — section 4.1 du FRD). Les 4 champs sont obligatoires.
+         Le village est un menu déroulant fermé (rempli par main.js depuis
+         la liste de référence de la coopérative), pas un champ libre.
+
+         *** NE PAS MODIFIER les id ci-dessous — main.js les utilise ***
+         ===================================================================== -->
+    <form id="form-nouveau-membre">
+      <input type="text" id="nm-prenom" placeholder="Prénom">
+      <input type="text" id="nm-nom" placeholder="Nom">
+      <select id="nm-village"><option value="">-- Choisir un village --</option></select>
+      <input type="text" id="nm-contact" placeholder="Contact (téléphone)">
+      <button type="submit">Créer le membre</button>
+    </form>
+
+    <div id="erreurs-nouveau-membre" hidden></div>
+    <div id="message-succes-nouveau-membre" hidden></div>
   </main>
 
   <!-- NE PAS MODIFIER — scripts de connexion au backend -->

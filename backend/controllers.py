@@ -4,7 +4,7 @@
 ========================================================================
 C'est ici que l'API "branche" vos fonctions de logic.py. Vous n'avez rien
 à toucher. Si vos fonctions dans logic.py sont correctes, ces contrôleurs
-renverront automatiquement les bons résultats pour les 6 modules
+renverront automatiquement les bons résultats pour les 8 modules
 d'AgriCoop Connect.
 ========================================================================
 """
@@ -50,11 +50,40 @@ def membres_controller():
         resultat.append({
             "id": m["id"],
             "nom": m["nom"],
+            "village": m.get("village"),
+            "contact": m.get("contact"),
             "solde": solde,
             "statut_cotisation": statut,
         })
     inactifs = logic.detecter_membres_inactifs(d["membres"], d["livraisons"])
     return {"membres": resultat, "membres_inactifs": inactifs}
+
+
+def creer_membre_controller(donnees):
+    d = _charger_donnees()
+    anomalies = logic.valider_nouveau_membre(donnees)
+    if anomalies:
+        return {"succes": False, "anomalies": anomalies}
+
+    nom_complet = f"{donnees['prenom'].strip()} {donnees['nom'].strip()}"
+    doublon = logic.rechercher_membre_similaire(nom_complet, d["membres"])
+    if doublon:
+        return {
+            "succes": False,
+            "anomalies": [f"Un membre très similaire existe déjà : {doublon['nom']}."],
+            "membre_existant": doublon,
+        }
+
+    nouvel_id = max((m["id"] for m in d["membres"]), default=0) + 1
+    nouveau_membre = {
+        "id": nouvel_id,
+        "nom": nom_complet,
+        "date_adhesion": donnees.get("date_adhesion", "2026-07-17"),
+        "village": donnees["village"].strip(),
+        "contact": donnees["contact"].strip(),
+    }
+    d["membres"].append(nouveau_membre)
+    return {"succes": True, "membre": nouveau_membre}
 
 
 def membre_detail_controller(membre_id):
@@ -135,6 +164,7 @@ def enregistrer_paiement_controller(nouveau_paiement):
         "membre_id": membre_id,
         "montant": nouveau_paiement["montant"],
         "date": nouveau_paiement.get("date", "2026-07-17"),
+        "mode_paiement": nouveau_paiement.get("mode_paiement", "Espèces"),
     }
     d["paiements"].append(paiement_complet)
 
@@ -205,3 +235,68 @@ def statistiques_controller():
 def rapport_bailleur_controller():
     d = _charger_donnees()
     return logic.generer_indicateurs_rapport_bailleur(d["livraisons"], d["ventes"], d["paiements"])
+
+
+# ---------- Module 7 : Authentification & Comptes (NOUVEAU) --------------
+def login_controller(identifiants):
+    d = _charger_donnees()
+    utilisateur = logic.authentifier_utilisateur(
+        identifiants.get("nom_utilisateur", ""),
+        identifiants.get("mot_de_passe", ""),
+        d["utilisateurs"],
+    )
+    if utilisateur is None:
+        return {"succes": False, "erreur": "Identifiant ou mot de passe incorrect."}
+    return {"succes": True, "utilisateur": utilisateur}
+
+
+def utilisateurs_controller():
+    d = _charger_donnees()
+    # On ne renvoie jamais les mots de passe, même à l'écran de gestion des comptes.
+    return [
+        {
+            "id": u["id"],
+            "nom_utilisateur": u["nom_utilisateur"],
+            "role": u["role"],
+            "nom_complet": u["nom_complet"],
+            "membre_id": u["membre_id"],
+        }
+        for u in d["utilisateurs"]
+    ]
+
+
+def creer_utilisateur_controller(donnees):
+    d = _charger_donnees()
+    nom_utilisateur = donnees.get("nom_utilisateur", "").strip()
+    if not nom_utilisateur or not donnees.get("mot_de_passe") or not donnees.get("role"):
+        return {"succes": False, "erreur": "Nom d'utilisateur, mot de passe et rôle sont obligatoires."}
+
+    if any(u["nom_utilisateur"] == nom_utilisateur for u in d["utilisateurs"]):
+        return {"succes": False, "erreur": "Ce nom d'utilisateur existe déjà."}
+
+    if donnees["role"] not in logic.ACTIONS_PAR_ROLE:
+        return {"succes": False, "erreur": f"Rôle inconnu : {donnees['role']}."}
+
+    nouvel_id = max((u["id"] for u in d["utilisateurs"]), default=0) + 1
+    nouvel_utilisateur = {
+        "id": nouvel_id,
+        "nom_utilisateur": nom_utilisateur,
+        "mot_de_passe": donnees["mot_de_passe"],
+        "role": donnees["role"],
+        "nom_complet": donnees.get("nom_complet", nom_utilisateur),
+        "membre_id": donnees.get("membre_id"),
+    }
+    d["utilisateurs"].append(nouvel_utilisateur)
+    return {
+        "succes": True,
+        "utilisateur": {k: v for k, v in nouvel_utilisateur.items() if k != "mot_de_passe"},
+    }
+
+
+def villages_controller():
+    d = _charger_donnees()
+    return d["villages"]
+
+
+def verifier_acces_controller(role, action):
+    return {"autorise": logic.verifier_acces_role(role, action)}

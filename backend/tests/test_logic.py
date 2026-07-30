@@ -188,6 +188,31 @@ def test_historique_paiements_membre_aucun():
     assert logic.calculer_historique_paiements_membre(99, []) == []
 
 
+def test_rechercher_membre_similaire_trouve_malgre_casse_et_espaces():
+    membres = [{"id": 1, "nom": "Jean Mabiala"}, {"id": 2, "nom": "Alphonsine Nkounkou"}]
+    resultat = logic.rechercher_membre_similaire("  jean   MABIALA ", membres)
+    assert resultat is not None
+    assert resultat["id"] == 1
+
+
+def test_rechercher_membre_similaire_aucun_doublon():
+    membres = [{"id": 1, "nom": "Jean Mabiala"}]
+    assert logic.rechercher_membre_similaire("Marie Koumba", membres) is None
+
+
+def test_valider_nouveau_membre_champs_manquants():
+    donnees = {"nom": "Koumba", "prenom": "", "village": "Séo", "contact": ""}
+    anomalies = logic.valider_nouveau_membre(donnees)
+    assert len(anomalies) == 2
+    assert any("prénom" in a for a in anomalies)
+    assert any("contact" in a for a in anomalies)
+
+
+def test_valider_nouveau_membre_complet():
+    donnees = {"nom": "Koumba", "prenom": "Marie", "village": "Séo", "contact": "064111222"}
+    assert logic.valider_nouveau_membre(donnees) == []
+
+
 # ========================================================================
 # ZONE C
 # ========================================================================
@@ -253,3 +278,42 @@ def test_calculer_moyenne_prix_vente():
 
 def test_calculer_moyenne_prix_vente_culture_absente():
     assert logic.calculer_moyenne_prix_vente([], "Arachide") == 0
+
+
+# ========================================================================
+# ZONE D
+# ========================================================================
+
+def test_authentifier_utilisateur_identifiants_corrects():
+    utilisateurs = [
+        {"nom_utilisateur": "smalonga", "mot_de_passe": "Secretaire2026",
+         "role": "Secrétaire", "nom_complet": "Sandra Malonga", "membre_id": 4}
+    ]
+    resultat = logic.authentifier_utilisateur("smalonga", "Secretaire2026", utilisateurs)
+    assert resultat is not None
+    assert resultat["role"] == "Secrétaire"
+    assert "mot_de_passe" not in resultat
+
+
+def test_authentifier_utilisateur_mot_de_passe_incorrect():
+    utilisateurs = [
+        {"nom_utilisateur": "smalonga", "mot_de_passe": "Secretaire2026",
+         "role": "Secrétaire", "nom_complet": "Sandra Malonga", "membre_id": 4}
+    ]
+    assert logic.authentifier_utilisateur("smalonga", "mauvais_mdp", utilisateurs) is None
+
+
+def test_authentifier_utilisateur_inconnu():
+    assert logic.authentifier_utilisateur("inconnu", "peu_importe", []) is None
+
+
+def test_verifier_acces_role_autorise():
+    assert logic.verifier_acces_role("Trésorière", "enregistrer_paiement") is True
+
+
+def test_verifier_acces_role_refuse():
+    assert logic.verifier_acces_role("Trésorière", "enregistrer_vente") is False
+
+
+def test_verifier_acces_role_role_inconnu():
+    assert logic.verifier_acces_role("Livreur", "tableau_de_bord") is False
