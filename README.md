@@ -2,7 +2,7 @@
 
 Bienvenue dans votre startup. Ce dépôt est le **squelette** de l'application : un mini-site de 8 pages pour digitaliser la gestion de la coopérative COMAKI (authentification, membres, livraisons, paiements, ventes, stock, statistiques). La structure est déjà en place ; **votre équipe complète les fonctions manquantes et construit les pages**.
 
-Vous avez **quelques jours comme prevu dans le document ** pour ce projet.
+Vous avez **quelques jours comme prevu dans le document** pour ce projet.
 
 > Cette version intègre les résultats de l'analyse menée par les équipes Business Analyst à partir du cahier des charges COMAKI : un module d'authentification (la Secrétaire assure le rôle d'administratrice) et la création de nouveaux membres directement dans l'application.
 
